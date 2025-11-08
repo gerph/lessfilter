@@ -35,6 +35,8 @@
 # by this file. If this is the case, remove the ~/.cache/lessfilter/* files and the
 # next run will cache files.
 #
+# This file is licensed under MIT license.
+#
 
 check_supported=false
 if [[ "$1" == '--supports' ]] ; then
