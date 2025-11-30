@@ -709,6 +709,8 @@ function format_markdown() {
                          }
                          $inbackticks = 0;
                          $intable = 0;
+                         $infrontmatter = 0;
+                         $maybefrontmatter = 1;
                   }
                   chomp;
                   if ($inbackticks)
@@ -735,12 +737,38 @@ function format_markdown() {
                     flush();
                     print "$_\n";
                   }
+                  elsif ($maybefrontmatter && /^-?[a-z_0-9\.\-]+:/)
+                  {
+                    $infrontmatter = 1;
+                    $maybefrontmatter = 0;
+                    flush();
+                    goto frontmatter;
+                  }
+                  elsif (/^---+$/)
+                  {
+                    $maybefrontmatter = 1;
+                    $infrontmatter = 0;
+                    flush();
+                    print "$_\n";
+                  }
+                  elsif ($infrontmatter && (/^ *-?[a-z_0-9\.\-]+:/ || /^ +-/))
+                  {
+                    # Frontmatter is usually key-value pairs using : separation, but can be
+                    # full YAML content.
+                  frontmatter:
+                    if (/^(#|\*|!|\-\-\-)/ || /^\s*$/)
+                    {
+                        $infrontmatter = 0;
+                        goto regular_line;
+                    }
+                    print "$_\n";
+                  }
                   else
                   {
                   regular_line:
 
                     my $indent = "";
-                    if (/^ +|^[\*-]|^#|^\[\^/ || $_ eq "")
+                    if (/^ +|^[\*-]|^#|^\[\^|^ *\d\. / || $_ eq "")
                     {
                       flush();
                       if ($_ eq "") { print "\n"; }
@@ -758,10 +786,13 @@ function format_markdown() {
                       $len += 1 + length($word);
                       push @acc, $word;
                     }
+                    $maybefrontmatter = 0;
                   }
                   END { flush(); }' "$file" | \
             perl -ne 'BEGIN { $star = undef; $starch = undef; $starindented = 0;
-                              $code = undef; $inbackticks = 0; $intable = 0; }
+                              $code = undef; $inbackticks = 0; $intable = 0;
+                              $infrontmatter = 0; $maybefrontmatter = 1;
+                            }
                       if ($inbackticks)
                       { if (/^\`\`\`/)
                         { $inbackticks = 0; }
@@ -783,15 +814,47 @@ function format_markdown() {
                         s/\|/\e[1;30m|\e[0m/g;
                         $intable = 1;
                       }
+                      elsif (/^(#|---+)/)
+                      {
+                        $starindented = 0;
+                        $star = undef;
+                        $infrontmatter = 0;
+                        if (/^---/)
+                        {
+                            $maybefrontmatter = 1;
+                        }
+                      }
+                      elsif ($maybefrontmatter && /^-?[a-z_0-9\.\-]+:/)
+                      {
+                        $infrontmatter = 1;
+                        $maybefrontmatter = 0;
+                        goto frontmatter;
+                      }
+                      elsif ($infrontmatter && (/^ *-?[a-z_0-9\.\-]+:/ || /^ +-/))
+                      {
+                        # Frontmatter is usually key-value pairs using : separation, but can be
+                        # full YAML content.
+                      frontmatter:
+                        if (/^(#|\*|!|\-\-\-)/ || /^\s*$/)
+                        {
+                            $infrontmatter = 0;
+                        }
+                        else
+                        {
+                            s/^( *)(-?[a-z_0-9\.\-]+):(?:( +)(.*))?/$1\e[33m$2\e[0m:$3\e[36m$4\e[0m/;
+                        }
+                      }
                       elsif (defined $star && /^$star[^$starch]/ && $_ ne "\n")
                         { $_ = "$star  $_"; $starindented = 1; }
-                      elsif (defined $star && /^$star$starch/ && $starindented)
+                      elsif (defined $star && /^$star[$starch]/ && $starindented)
                         { $_ = "\n$star$_"; $starindented = 0; }
                       elsif ($code && !/^    / && $_ ne "\n")
                         { s/([^ ]+)/\e[33m$1\e[0m/g;
                           $_ = "        $_"; }
-                      elsif (/^( *)([\*-])/)
+                      elsif (/^( *)([\*\-]) /)
                         { $star = $1; $starch=$2; $starindented = 0; }
+                      elsif (/^( *)\d\. /)
+                        { $star = $1; $starch="1-9"; $starindented = 0; }
                       elsif (/^\`\`\`/)
                         { $inbackticks = 1; }
                       elsif (/^    [^ ]/)
