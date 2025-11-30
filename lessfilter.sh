@@ -1317,6 +1317,10 @@ function identify_extension() {
             infered_extension='.h'
             ;;
 
+        *,18c)
+            infered_extension='.lua'
+            ;;
+
     esac
 }
 
