@@ -23,6 +23,7 @@
 #   * otool - for MachO files
 #   * openssl - for certificates and keys
 #   * plutil - for plist files
+#   * python - for decoding python bytecode
 #
 # Usage:
 #   .lessfilter <file>
@@ -114,6 +115,68 @@ function sed_inplace() {
     else
         sed -i "$@"
     fi
+}
+
+realpath_counter=0
+##
+# Normalise the path, removing any symbolic links, etc.
+#
+# Implemented here as a long-winded manual process to evaluate the paths
+# so that we avoid any limitations of the system that we are installed
+# on.
+function realpath() {
+    local path="$1"
+    local OLDIFS
+    local pathaccumulator
+    local leadingpath
+    local link
+
+    realpath_counter=$((realpath_counter+1))
+    if [[ "${realpath_counter}" -gt 20 ]] ; then
+        echo "Too many iterations in realpath (${realpath_counter}) processing '$path'" >&2
+        realpath_counter=$((realpath_counter-1))
+        return 1
+    fi
+
+    if [[ "${path:0:1}" != '/' ]] ; then
+        path="$(pwd -P)/${path}"
+    fi
+
+    OLDIFS="$IFS"
+    IFS='/'
+    for segment in $path ; do
+        if [[ "$segment" == '.' ]] ; then
+            continue
+        elif [[ "$segment" == '..' ]] ; then
+            pathaccumulator="${pathaccumulator%/*/*}"
+        elif [[ "$segment" != '' ]] ; then
+            leadingpath="${pathaccumulator}${segment}"
+            link="$(readlink "$leadingpath")"
+            if [[ "$link" != "" ]] ; then
+                if [[ "${link:0:1}" == '/' ]] ; then
+                    pathaccumulator="$(realpath "${link}")"
+                else
+                    pathaccumulator="$(realpath "${pathaccumulator}${link}")/"
+                fi
+            else
+                pathaccumulator="${leadingpath}"
+            fi
+        else
+            if [[ "$pathaccumulator" == '' ]] ; then
+                pathaccumulator="/"
+            fi
+        fi
+
+        # If the trailing '/' is absent, add one.
+        if [[ "${pathaccumulator: -1}" != '/' ]] ; then
+            pathaccumulator="${pathaccumulator}/"
+        fi
+    done
+    if [[ "${path: -1}" != '/' && "${pathaccumulator: -1}" == '/' ]] ; then
+        pathaccumulator="${pathaccumulator:0: ${#pathaccumulator} - 1}"
+    fi
+    echo -n "$pathaccumulator"
+    realpath_counter=$((realpath_counter-1))
 }
 
 
@@ -286,8 +349,21 @@ function colour_pygments() {
             c/*|*/c/*|h/*|*/h/*)
                 lexer='c'
                 ;;
+
             s/*|*/s/*|hdr/*|*/hdr/*)
                 lexer='arm'
+                ;;
+
+            p/*|*/p/*|pas/*|*/pas/*|imp/*|*/imp/*)
+                lexer='pascal'
+                ;;
+
+            f/*|*/f/*|for/*|*/for/*|f77/*|*/f77/*)
+                lexer='fortranfixed'
+                ;;
+
+            f90/*|*/f90/*)
+                lexer='fortran'
                 ;;
 
             *,fe1)
@@ -612,7 +688,7 @@ function format_armdiss() {
     for f in "$file" "$infered_extension" ; do
         case "$f" in
 
-            *,ffa|*,ff8|*,ffc|*,f95)
+            *,ffa|*,ff8|*,ffc|*,f95|*.arm)
                 format_to_suffix="arm"
                 ;;
         esac
@@ -646,7 +722,7 @@ function format_armdumpi() {
     for f in "$file" "$infered_extension" ; do
         case "$f" in
 
-            *,ffa|*,ff8|*,ffc)
+            *,ffa|*,ff8|*,ffc|*,f95|*.arm)
                 format_to_suffix="arm"
                 ;;
         esac
@@ -870,11 +946,103 @@ function format_markdown() {
                       # Footnotes
                       s!(\[\^[^\]]+\])!\e[0;35m$1\e[m!g;
 
+                      # Checklist
+                      # Also broken by pygmentize
+                      #s! (\[[ X]\]) ! \e[0;35m$1\e[m !g;
+
                       # Simple comments
                       # Cannot use this one either, as pygmentize breaks it
                       #s/(<!--[^>]*-->)/\e[0;32m$1\e[m/g;
 
                       print' \
+            > "${tmpdir}/${format_to}"
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
+# Reformat the Python cache files with a disassembly
+function format_pyc() {
+    local format_to_suffix=''
+    local format_to=''
+    local realfile
+    local f
+    local args
+    local python=
+
+    if type -p python > /dev/null ; then
+        python=python
+    elif type -p python3 > /dev/null ; then
+        python=python3
+    fi
+    if [[ "$python" == '' ]] ; then
+        return
+    fi
+
+    for f in "$file" "$infered_extension" ; do
+        case "$f" in
+
+            *.pyc)
+                format_to_suffix="pyc"
+                ;;
+        esac
+
+        if [[ "$format_to_suffix" != '' ]] ; then
+            break
+        fi
+    done
+
+    if [[ "$format_to_suffix" != '' ]] ;then
+        format_to="$(basename "$file"):formatted:.${format_to_suffix}"
+        accept_format
+        # We want to feed the file to Python to decode it.
+        realfile=$(realpath "$file")
+        python -c '
+# Source - https://stackoverflow.com/questions/11141387/given-a-python-pyc-file-is-there-a-tool-that-let-me-view-the-bytecode
+# Posted by ВелоКастръ, modified by community. See post "Timeline" for change history
+# Retrieved 2025-12-03, License - CC BY-SA 4.0
+
+import platform
+import time
+import sys
+import binascii
+import marshal
+import dis
+import struct
+
+
+def view_pyc_file(path):
+    """Read and display a content of the Python bytecode in a pyc-file."""
+
+    file = open(path, "rb")
+
+    magic = file.read(4)
+    timestamp = file.read(4)
+    size = None
+
+    if sys.version_info.major == 3 and sys.version_info.minor >= 3:
+        size = file.read(4)
+        size = struct.unpack("I", size)[0]
+
+    code = marshal.load(file)
+
+    magic = binascii.hexlify(magic).decode("utf-8")
+    timestamp = time.asctime(time.localtime(struct.unpack("I", timestamp)[0]))
+
+    print(
+        "Python version: {}\nMagic code: {}\nTimestamp: {}\nSize: {}"
+        .format(platform.python_version(), magic, timestamp, size or "not known")
+    )
+    print("-" * 80)
+
+    dis.disassemble(code)
+
+    file.close()
+
+
+if __name__ == "__main__":
+    view_pyc_file(sys.argv[1])' "$realfile" | sed -e "s@${realfile%.pyc}.py@<pysource>@g" \
             > "${tmpdir}/${format_to}"
         file="${tmpdir}/${format_to}"
     fi
@@ -1256,7 +1424,9 @@ function format_libfile() {
 # Sets infered_extension to the extension that has been determined
 # from the content.
 function identify_file() {
-    file_type=$(file "$file" 2>/dev/null)
+    # Only allow the first 20K to decode files; otherwise huge files will take an age
+    # to be processed.
+    file_type=$(head -c 20000 "$file" | file - 2>/dev/null)
     infered_extension=''
     if [[ "$file_type" =~ shell\ script ]] ; then
         infered_extension='.sh'
@@ -1270,6 +1440,8 @@ function identify_file() {
         infered_extension='.elf-arm64'
     elif [[ "$file_type" =~ RISC\ OS.*AOF ]] ; then
         infered_extension='.aof'
+    elif [[ "$file_type" =~ RISC\ OS\ AIF ]] ; then
+        infered_extension='.arm'
     elif [[ "$file_type" =~ RISC\ OS.*ALF ]] ; then
         infered_extension='.alf'
     elif [[ "$file_type" =~ Mach-O ]] ; then
@@ -1284,6 +1456,8 @@ function identify_file() {
         infered_extension='.crt'
     elif [[ "$file_type" =~ ar\ archive ]] ; then
         infered_extension='.a'
+    elif [[ "$file_type" =~ python.*byte-compiled ]] ; then
+        infered_extension='.pyc'
     elif [[ "$file_type" =~ ASCII\ text ]] ; then
         # YAML files are not recognised as such by the `file` tool, so we'll look at the first
         # line and see what we think.
@@ -1317,7 +1491,7 @@ function identify_extension() {
             infered_extension='.h'
             ;;
 
-        *,18c)
+        *,18c|*,18d)
             infered_extension='.lua'
             ;;
 
@@ -1344,6 +1518,7 @@ format_macho
 format_markdown
 format_plist
 format_openssl
+format_pyc
 
 # Now the colourers
 colour_csvkit
