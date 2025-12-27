@@ -1430,7 +1430,7 @@ function identify_file() {
     infered_extension=''
     if [[ "$file_type" =~ shell\ script ]] ; then
         infered_extension='.sh'
-    elif [[ "$file_type" =~ Perl\ script ]] ; then
+    elif [[ "$file_type" =~ [Pp]erl\ script ]] ; then
         infered_extension='.pl'
     elif [[ "$file_type" =~ Python\ script ]] ; then
         infered_extension='.py'
