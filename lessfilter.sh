@@ -1417,6 +1417,25 @@ function format_libfile() {
 }
 
 
+##
+# Reformat the CODEOWNERS file; which we have to do ourselves
+function colour_codeowners() {
+    case "$file" in
+
+        */CODEOWNERS|CODEOWNERS)
+            accept_file
+            sed -E -e 's!^(#.*)$!#\x1b[32m\1\x1b[0m!' \
+                   -e 's!^([^# ][^ ]*) !\x1b[37m\1\x1b[0m !' \
+                   -e 's! (@[a-zA-Z_0-9-]{2,})! \x1b[35m\1\x1b[0m!g' \
+                   -e 's! ([a-zA-Z_0-9.-]{2,}@[a-zA-Z_0-9-]{2,}\.[a-zA-Z_0-9.-]{2,})! \x1b[36m\1\x1b[0m!g' \
+                   -e 's!^#!!' \
+                   "$file"
+            exit 0
+            ;;
+
+    esac
+}
+
 
 ##
 # Identify the filetype using the 'file' tool.
@@ -1525,6 +1544,7 @@ colour_csvkit
 colour_grc
 colour_jq
 colour_pygments
+colour_codeowners
 
 
 if $reformatted ; then
