@@ -26,6 +26,7 @@
 #   * python - for decoding python bytecode
 #   * unzip - for decoding archives
 #   * riscos-unzip - for decoding archives with RISC OS types in
+#   * nspark - for decoding RISC OS archives (Spark, ArcFS and Squash)
 #
 # Usage:
 #   .lessfilter <file>
@@ -1501,6 +1502,61 @@ function format_zip() {
 
 
 ##
+# Reformat the file, if we can, using nspark
+function format_nspark() {
+    local format_to_suffix=''
+    local format_to=''
+    local f
+    local args=()
+    local tool=
+
+    # ArcFS starts 'Archive\0'
+
+    if type -p nspark > /dev/null ; then
+        tool="nspark"
+        #args=("-l")    # Simple list
+        args=("-lv")    # Extended list
+    elif type -p riscos-nspark > /dev/null ; then
+        tool="riscos-nspark"
+        #args=("-l")    # Simple list
+        args=("-lv")    # Extended list
+    fi
+
+    for f in "$file" "$infered_extension" ; do
+        case "$f" in
+
+            *.arc)
+                format_to_suffix="arc"
+                ;;
+
+            # NSpark doesn't seem to handle this (I thought it did?)
+            #*.squash|,fca)
+            #    format_to_suffix="squash"
+            #    ;;
+        esac
+
+        if [[ "$format_to_suffix" != '' ]] ; then
+            break
+        fi
+    done
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$format_to_suffix" != '' ]] ;then
+        format_to="$(basename "$file"):formatted:.${format_to_suffix}"
+        accept_format
+        printf "NSpark archive\n--------------\n\n" > "${tmpdir}/${format_to}"
+        "${tool}" "${args[@]}" "$file" >> "${tmpdir}/${format_to}" 2>&1
+        # Fix up a misformat in some of the output
+        sed_inplace -E -e 's!( storage)(------)!\1\x0a\2!' -e 's!( ---- -------)([^-])!\1\x0a\2!' "${tmpdir}/${format_to}"
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
 # Reformat the CODEOWNERS file; which we have to do ourselves
 function colour_codeowners() {
     case "$file" in
@@ -1562,6 +1618,8 @@ function identify_file() {
         infered_extension='.pyc'
     elif [[ "$file_type" =~ Zip\ archive\ data ]] ; then
         infered_extension='.zip'
+    elif [[ "$file_type" =~ squished\ archive\ data ]] ; then
+        infered_extension='.squash'
     elif [[ "$file_type" =~ ASCII\ text ]] ; then
         # YAML files are not recognised as such by the `file` tool, so we'll look at the first
         # line and see what we think.
@@ -1624,6 +1682,7 @@ format_plist
 format_zip
 format_openssl
 format_pyc
+format_nspark
 
 # Now the colourers
 colour_csvkit
