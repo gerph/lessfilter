@@ -23,7 +23,7 @@
 #   * otool - for MachO files
 #   * openssl - for certificates and keys
 #   * plutil - for plist files
-#   * python - for decoding python bytecode
+#   * python - for decoding Python bytecode
 #   * unzip - for decoding archives
 #   * riscos-unzip - for decoding archives with RISC OS types in
 #   * nspark - for decoding RISC OS archives (Spark, ArcFS and Squash)
