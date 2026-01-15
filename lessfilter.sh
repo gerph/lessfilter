@@ -403,6 +403,12 @@ function colour_pygments() {
                 pygmentize_format=terminal256
                 ;;
 
+            yaml)
+                # The YAML output for style 'rrt' is very ugly.
+                # Fruity keeps a green comment and blue strings, which is nice.
+                pygmentize_style=fruity
+                ;;
+
             markdown|md)
                 # For markdown, this looks better
                 if [[ "$(pygments_version)" == '2.5.2' ]] ; then
