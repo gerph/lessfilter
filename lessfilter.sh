@@ -884,7 +884,8 @@ function format_markdown() {
                         else
                         {
                             s/\e\[[0-9;]*m//g;
-                            $_ = "\e[33m$_\e[0m";
+                            # Leave the colouring of the backticks to Pygmentize
+                            #$_ = "\e[33m$_\e[0m";
                         }
                       }
                       elsif ($intable)
@@ -907,6 +908,10 @@ function format_markdown() {
                         if (/^---/)
                         {
                             $maybefrontmatter = 1;
+                        }
+                        else
+                        {
+                            $maybefrontmatter = 0;
                         }
                       }
                       elsif ($maybefrontmatter && /^-?[a-z_0-9\.\-]+:/)
@@ -933,7 +938,7 @@ function format_markdown() {
                         { $_ = "$star  $_"; $starindented = 1; }
                       elsif (defined $star && /^$star[$starch]/ && $starindented)
                         { $_ = "\n$star$_"; $starindented = 0; }
-                      elsif ($code && !/^    / && $_ ne "\n")
+                      elsif ($code && !/^    / && $_ =~ /^(\e\[[0-9;]*m)*\n/)
                         { s/([^ ]+)/\e[33m$1\e[0m/g;
                           $_ = "        $_"; }
                       elsif (/^( *)([\*\-]) /)
@@ -942,7 +947,7 @@ function format_markdown() {
                         { $star = $1; $starch="1-9"; $starindented = 0; }
                       elsif (/^\`\`\`/)
                         { $inbackticks = 1; }
-                      elsif (/^    [^ ]/)
+                      elsif (/^    [^ ]/ || (/^    / && $code == 1))
                         { $code = 1; s/^    //;
                           s/([^ ]+)/\e[33m$1\e[0m/g;
                           $_ = "    $_";
