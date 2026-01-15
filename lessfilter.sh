@@ -1209,7 +1209,7 @@ function format_objdump() {
     for f in "$file" "$infered_extension" ; do
         case "$f" in
 
-            *.elf-arm64)
+            *.elf-arm64|*.elf-arm)
                 if [[ "$aarch64_objdump" != '' ]] ; then
                     tool=$aarch64_objdump
                 else
@@ -1601,6 +1601,8 @@ function identify_file() {
         infered_extension='.xml'
     elif [[ "$file_type" =~ ELF.*ARM\ aarch64 ]] ; then
         infered_extension='.elf-arm64'
+    elif [[ "$file_type" =~ ELF\ 32-bit.*ARM ]] ; then
+        infered_extension='.elf-arm'
     elif [[ "$file_type" =~ RISC\ OS.*AOF ]] ; then
         infered_extension='.aof'
     elif [[ "$file_type" =~ RISC\ OS\ AIF ]] ; then
