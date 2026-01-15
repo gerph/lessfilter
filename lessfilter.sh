@@ -24,6 +24,8 @@
 #   * openssl - for certificates and keys
 #   * plutil - for plist files
 #   * python - for decoding python bytecode
+#   * unzip - for decoding archives
+#   * riscos-unzip - for decoding archives with RISC OS types in
 #
 # Usage:
 #   .lessfilter <file>
@@ -1424,6 +1426,81 @@ function format_libfile() {
 
 
 ##
+# Reformat the file, if we can, using unzip -l, or riscos-unzip if the content is RISC OS
+function format_zip() {
+    local format_to_suffix=''
+    local format_to=''
+    local f
+    local args=()
+    local tool=
+    local have_riscos=false
+    local force_riscos=false
+
+    if type -p unzip > /dev/null ; then
+        tool="unzip"
+        #args=("-l")    # Simple list
+        args=("-Zs")    # Extended list
+    fi
+    if type -p riscos-unzip > /dev/null ; then
+        have_riscos=true
+        if [[ "$tool" == '' ]] ; then
+            force_riscos=true
+            tool="riscos-unzip"
+            args=("-l")
+        fi
+    fi
+
+    for f in "$file" "$infered_extension" ; do
+        case "$f" in
+
+            *.zip)
+                format_to_suffix="zip"
+                ;;
+        esac
+
+        if [[ "$format_to_suffix" != '' ]] ; then
+            break
+        fi
+    done
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$format_to_suffix" != '' ]] ;then
+        format_to="$(basename "$file"):formatted:.${format_to_suffix}"
+        accept_format
+        if $have_riscos && [[ "$file" =~ ,a91 ]] ; then
+            # This is a RISC OS Zip archive; force to unzip with filetypes
+            force_riscos=true
+        elif grep -q -a AC..ARC0 "$file" ; then
+            # This is probably a RISC OS Zip archive
+            force_riscos=true
+        fi
+        if ! $force_riscos ; then
+            printf "PKZip archive\n-------------\n\n" > "${tmpdir}/${format_to}"
+            "${tool}" "${args[@]}" "$file" >> "${tmpdir}/${format_to}"
+
+            # We have the zip data list in a file now; let's quickly check if it's
+            # got RISC OS content in it.
+            # We check if the creator was 'aco' (Acorn), which is unlikely but possible.
+            # And if there's an Application in it, we use that.
+            if $have_riscos && ! $force_riscos && grep -E -q " aco |[/]![A-Za-z0-9]+/!Run" "${tmpdir}/${format_to}" 2> /dev/null ; then
+                force_riscos=true
+            fi
+        fi
+        if $force_riscos ; then
+            printf "PKZip archive (RISC OS)\n-----------------------\n\n" > "${tmpdir}/${format_to}"
+            riscos-unzip -l "$file" >> "${tmpdir}/${format_to}"
+        fi
+
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
 # Reformat the CODEOWNERS file; which we have to do ourselves
 function colour_codeowners() {
     case "$file" in
@@ -1483,6 +1560,8 @@ function identify_file() {
         infered_extension='.a'
     elif [[ "$file_type" =~ python.*byte-compiled ]] ; then
         infered_extension='.pyc'
+    elif [[ "$file_type" =~ Zip\ archive\ data ]] ; then
+        infered_extension='.zip'
     elif [[ "$file_type" =~ ASCII\ text ]] ; then
         # YAML files are not recognised as such by the `file` tool, so we'll look at the first
         # line and see what we think.
@@ -1542,6 +1621,7 @@ format_objdump
 format_macho
 format_markdown
 format_plist
+format_zip
 format_openssl
 format_pyc
 
