@@ -38,8 +38,8 @@ coloured:
 A few tools are used to convert binary files to textual format:
 
 * `xmllint` - for XML
-* `bastotxt` or `riscos-basicdetokenise - for tokenised BBC BASIC
-* `armdiss` or riscos-dumpi - for ARM binaries
+* `bastotxt` or `riscos-basicdetokenise` - for tokenised BBC BASIC
+* `armdiss` or `riscos-dumpi` - for ARM binaries
 * `riscos-dump` - for data files binaries
 * `riscos-decaof` - for AOF files
 * `riscos-libfile` - for ALF files
@@ -48,6 +48,11 @@ A few tools are used to convert binary files to textual format:
 * `otool` - for MachO files
 * `openssl` - for certificates and keys
 * `plutil` - for plist files
+* `python` - for decoding Python bytecode
+* `unzip` - for decoding archives
+* `riscos-unzip` - for decoding archives with RISC OS types in
+* `nspark` - for decoding RISC OS archives (Spark, ArcFS and Squash)
+* `decdrawf` - for decoding RISC OS Drawfiles.
 
 
 ## Manual usage
