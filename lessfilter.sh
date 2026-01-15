@@ -671,8 +671,8 @@ function format_decaof() {
                      -e '/Attributes: Code/,/^\s*$/ s!^  0x([0-9a-f]{6}):  ([0-9a-f]{8})  (....) : (B|[A-Z]{2,})( {1,})!    \x1b[35m\1\x1b[0m:  \x1b[37m\2\x1b[0m  \3 : \x1b[33m\4\x1b[0m\5!' \
                      -e '/Attributes: Code/,/^\s*$/ s!^  0x([0-9a-f]{6}):  ([0-9a-f]{8})  (....) : (Undefined instruction)!    \x1b[35m\1\x1b[0m:  \x1b[37m\2\x1b[0m  \3 : \x1b[31m\4\x1b[0m!' \
                      -e '/Attributes: Code/,/^\s*$/ s!( ; .*)!\x1b[32m\1\x1b[0m!' \
-                     -e '/Attributes: Code/,/^\s*$/ s!([ ,\[{])(r1[0-5]|r[0-9]|lr|pc|sp|[cs]psr_[a-z]*)!\1\x1b[31m\2\x1b[0m!g' \
-                     -e '/Attributes: Code/,/^\s*$/ s!(,)(LSL|LSR|ASR|ROR)!\1\x1b[33m\2\x1b[0m!g' \
+                     -e '/Attributes: Code/,/^\s*$/ s!([ ,\[{-])(r1[0-5]|r[0-9]|lr|pc|sp|[cs]psr_[a-z]*)!\1\x1b[31m\2\x1b[0m!g' \
+                     -e '/Attributes: Code/,/^\s*$/ s!(,)(LSL|LSR|ASR|ROR|RRX)!\1\x1b[33m\2\x1b[0m!g' \
                      -e 's!(0x[A-Fa-f0-9]{2,8})([^\)a-f0-9]|$)!\x1b[35m\1\x1b[0m\2!g' \
                      -e 's!(^At |\[)([A-Fa-f0-9]{6,8})(:|\])!\1\x1b[35m\2\x1b[0m\3!g' \
                      -e 's!(symbol )([_!A-Za-z][^ ]*)!\1\x1b[36m\2\x1b[0m!g' \
