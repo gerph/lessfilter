@@ -27,6 +27,7 @@
 #   * unzip - for decoding archives
 #   * riscos-unzip - for decoding archives with RISC OS types in
 #   * nspark - for decoding RISC OS archives (Spark, ArcFS and Squash)
+#   * decdrawf - for decoding RISC OS Drawfiles.
 #
 # Usage:
 #   .lessfilter <file>
@@ -1562,6 +1563,57 @@ function format_nspark() {
 }
 
 
+##
+# Reformat the file, if we can, using decdrawf
+function format_drawfile() {
+    local format_to_suffix=''
+    local format_to=''
+    local f
+    local args=()
+    local tool=
+
+    if type -p decdrawf > /dev/null ; then
+        tool="decdrawf"
+    elif type -p riscos-decdrawf > /dev/null ; then
+        tool="riscos-decdrawf"
+    fi
+
+    for f in "$file" "$infered_extension" ; do
+        case "$f" in
+
+            *.drawfile)
+                format_to_suffix="drawfile"
+                ;;
+        esac
+
+        if [[ "$format_to_suffix" != '' ]] ; then
+            break
+        fi
+    done
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$format_to_suffix" != '' ]] ;then
+        format_to="$(basename "$file"):formatted:.${format_to_suffix}"
+        accept_format
+        printf "RISC OS Drawfile\n----------------\n\n" > "${tmpdir}/${format_to}"
+        "${tool}" "${args[@]}" "$file" \
+            | sed -E -e 's!\r!!' \
+                     -e 's!^( *)#(.*)$!\1\x1b[32m#\2\x1b[0m! ; / *\x1b\[32m#/ b' \
+                     -e 's!^([A-Z][^ ]{1,}) \{!\x1b[35m\1\x1b[0m {!' \
+                     -e 's!(".*")!\x1b[36m\1\x1b[0m!' \
+                     -e 's! (-?[0-9]{1,}(\.[0-9]{1,})?)! \x1b[33m\1\x1b[0m!g' \
+                     -e 's! r([0-9]{1,3})g([0-9]{1,3})b([0-9]{1,3})! \x1b[31mr\1\x1b[32mg\2\x1b[34mb\3\x1b[0m!g' \
+            >> "${tmpdir}/${format_to}" 2>&1
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
 # Reformat the CODEOWNERS file; which we have to do ourselves
 function colour_codeowners() {
     case "$file" in
@@ -1609,6 +1661,8 @@ function identify_file() {
         infered_extension='.arm'
     elif [[ "$file_type" =~ RISC\ OS.*ALF ]] ; then
         infered_extension='.alf'
+    elif [[ "$file_type" =~ RISC\ OS\ Draw\ file ]] ; then
+        infered_extension='.drawfile'
     elif [[ "$file_type" =~ Mach-O ]] ; then
         infered_extension='.macho'
     elif [[ "$file_type" =~ Apple\ binary\ property\ list ]] ; then
@@ -1664,6 +1718,10 @@ function identify_extension() {
             infered_extension='.lua'
             ;;
 
+        *,aff)
+            infered_extension='.drawfile'
+            ;;
+
     esac
 }
 
@@ -1690,6 +1748,7 @@ format_zip
 format_openssl
 format_pyc
 format_nspark
+format_drawfile
 
 # Now the colourers
 colour_csvkit
