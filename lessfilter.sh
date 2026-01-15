@@ -1422,11 +1422,11 @@ function format_libfile() {
     if [[ "$format_to_suffix" != '' ]] ;then
         format_to="$(basename "$file"):formatted:.${format_to_suffix}"
         accept_format
-        printf "RISC OS library archive\n----------------\n\nArchived files:\n" > "${tmpdir}/${format_to}"
+        printf "RISC OS library archive\n-----------------------\n\nArchived files:\n" > "${tmpdir}/${format_to}"
         riscos-libfile -l "$file" >> "${tmpdir}/${format_to}"
         printf "\n\nSymbols:\n" >> "${tmpdir}/${format_to}"
         riscos-libfile -s "$file" >> "${tmpdir}/${format_to}"
-        sed_inplace -E -e 's!^([A-Z][A-Za-z ]*:)!\x1b[35m\1\x1b[0m!g'
+        sed_inplace -E -e 's!^([A-Z][A-Za-z ]*:)!\x1b[35m\1\x1b[0m!g' "${tmpdir}/${format_to}"
         file="${tmpdir}/${format_to}"
     fi
 }
