@@ -1,0 +1,67 @@
+# BBC BASIC tokenised program files (RISC OS filetype &FFB)
+#
+# Heuristic detection:
+# - first record marker at offset 0
+# - first line number commonly 1 or 10
+# - sane first line length
+# - first tokenised byte either at offset 4 or after a leading space
+# - next record starts where the first line length says it should, and is
+#   either another line record or the end-of-program marker
+
+0	byte	0x0d
+>1	byte	0x00
+>>2	byte	0x01
+>>>3	ubyte	>4
+>>>>3	ubyte	<252
+>>>>>4	ubyte	>0x7e
+>>>>>>(3.b+0)	byte	0x0d
+>>>>>>>(3.b+1)	byte	0x00	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+>>>>>>>(3.b+1)	byte	0xff	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+
+0	byte	0x0d
+>1	byte	0x00
+>>2	byte	0x01
+>>>3	ubyte	>5
+>>>>3	ubyte	<252
+>>>>>4	byte	0x20
+>>>>>>5	ubyte	>0x7e
+>>>>>>>(3.b+0)	byte	0x0d
+>>>>>>>>(3.b+1)	byte	0x00	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+>>>>>>>>(3.b+1)	byte	0xff	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+
+0	byte	0x0d
+>1	byte	0x00
+>>2	byte	0x0a
+>>>3	ubyte	>4
+>>>>3	ubyte	<252
+>>>>>4	ubyte	>0x7e
+>>>>>>(3.b+0)	byte	0x0d
+>>>>>>>(3.b+1)	byte	0x00	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+>>>>>>>(3.b+1)	byte	0xff	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+
+0	byte	0x0d
+>1	byte	0x00
+>>2	byte	0x0a
+>>>3	ubyte	>5
+>>>>3	ubyte	<252
+>>>>>4	byte	0x20
+>>>>>>5	ubyte	>0x7e
+>>>>>>>(3.b+0)	byte	0x0d
+>>>>>>>>(3.b+1)	byte	0x00	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb
+>>>>>>>>(3.b+1)	byte	0xff	BBC BASIC tokenised program
+!:mime	application/x-bbcbasic-tokenised
+!:ext	ffb

@@ -1,0 +1,170 @@
+# BBC BASIC text program files (RISC OS filetype &FD1)
+#
+# Conservative heuristic detection based on common file starts:
+# - numbered form usually starts with line 1 or 10
+# - many sources begin with a REM header, often "REM >name"
+
+0	string	10REM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 REM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	1REM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	1 REM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	REM
+>3	byte	0x3e	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	REM
+>3	byte	0x20
+>>4	byte	0x3e	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	byte	0x20
+>1	byte	0x20
+>>2	byte	0x20
+>>>3	byte	0x31
+>>>>4	byte	0x30
+>>>>>5	byte	0x20
+>>>>>>6	byte	0x52
+>>>>>>>7	byte	0x45
+>>>>>>>>8	byte	0x4d
+>>>>>>>>>9	default	x	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	byte	0x20
+>1	byte	0x20
+>>2	byte	0x20
+>>>3	byte	0x31
+>>>>4	byte	0x30
+>>>>>5	byte	0x20
+>>>>>>6	byte	0x52
+>>>>>>>7	byte	0x45
+>>>>>>>>8	byte	0x4d
+>>>>>>>>>9	byte	0x20
+>>>>>>>>>>10	byte	0x3e
+>>>>>>>>>>>11	default	x	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	byte	0x20
+>1	byte	0x20
+>>2	byte	0x20
+>>>3	byte	0x31
+>>>>4	byte	0x30
+>>>>>5	byte	0x20
+>>>>>>6	byte	0x52
+>>>>>>>7	byte	0x45
+>>>>>>>>8	byte	0x4d
+>>>>>>>>>9	byte	0x3e
+>>>>>>>>>>10	default	x	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10DIM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 DIM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10DIM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 DIM	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10MODE	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 MODE	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10MODE	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 MODE	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10PRINT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 PRINT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10PRINT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 PRINT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10FOR	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 FOR	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10FOR	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 FOR	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10SYS	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 SYS	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10SYS	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 SYS	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10REPEAT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	10 REPEAT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10REPEAT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1
+
+0	string	   10 REPEAT	BBC BASIC text program
+!:mime	text/x-bbcbasic
+!:ext	fd1

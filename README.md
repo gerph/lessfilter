@@ -16,11 +16,20 @@ on Debian and Ubuntu systems with:
 
 On other systems (eg macOS), or if you need a local copy of the `lesspipe` tool, copy `lesspipe.sh` into your library. This was not written by me (I made small changes for macOS) - its authorship is in the file.
 
-Once the `lesspipe` system is intalled, it must be configured to be used by adding the contents of `bashd-less-filter.sh` to your `.bashrc` (or similar) files.
+Once the `lesspipe` system is installed, it must be configured to be used by adding the contents of `bashd-less-filter.sh` to your `.bashrc` (or similar) files.
 
 Finally, copy the `lessfilter.sh` as `~/.lessfilter`. This is the workhorse tool that will reformat and colour files.
 
-You may also wish to place the `junitxml.py` tool in your path as `junitxml`. This will summarise JUnix XML files commonly used for test results.
+You may also wish to place the `junitxml.py` tool in your path as `junitxml`. This will summarise JUnit XML files commonly used for test results.
+
+The `magic` directory contains optional definitions for the `file` tool. Installing
+these definitions in your system's magic database allows tokenised and textual BBC
+BASIC programs to be recognised by their contents when they do not have RISC OS
+filetype suffixes. The definitions can be tested without installing them with:
+
+```
+file -m magic/bbcbasic:magic/bbcbasictext <file>
+```
 
 ## Usage
 
@@ -34,6 +43,7 @@ coloured:
 * `jq` - for JSON
 * `csvkit` - for CSV
 * `grc` - for dot
+* `nano-colour` - for formats supported by installed Nano syntax definitions
 
 A few tools are used to convert binary files to textual format:
 
@@ -49,11 +59,21 @@ A few tools are used to convert binary files to textual format:
 * `openssl` - for certificates and keys
 * `plutil` - for plist files
 * `python` - for decoding Python bytecode
-* `unzip` - for decoding archives
-* `riscos-unzip` - for decoding archives with RISC OS types in
+* `unzip` - for decoding Zip archives
+* `riscos-unzip` - for decoding archives with RISC OS types
 * `nspark` - for decoding RISC OS archives (Spark, ArcFS and Squash)
-* `decdrawf` - for decoding RISC OS Drawfiles.
+* `riscos-tbafs` - for listing TBAFS files
+* `riscos-shextract` - for listing StrongHelp files
+* `decdrawf` - for decoding RISC OS Drawfiles
+* `riscos-dumpsprites` - for decoding RISC OS sprites
+* `ccres` or `riscos-ccres` - for decoding RISC OS templates and Toolbox resources
 
+A few standard tools are used to help identify and post-process files:
+
+* `perl`
+* `sed`
+* `grep`
+* `file`, optionally with the BBC BASIC definitions supplied in `magic`
 
 ## Manual usage
 

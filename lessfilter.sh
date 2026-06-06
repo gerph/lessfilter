@@ -9,6 +9,7 @@
 #   * jq - for JSON
 #   * csvkit - for CSV
 #   * grc - for dot
+#   * nano-colour - for many file formats
 #
 # A few tools are used to convert binary files to textual format:
 #
@@ -24,10 +25,21 @@
 #   * openssl - for certificates and keys
 #   * plutil - for plist files
 #   * python - for decoding Python bytecode
-#   * unzip - for decoding archives
-#   * riscos-unzip - for decoding archives with RISC OS types in
+#   * unzip - for decoding Zip archives
+#   * riscos-unzip - for decoding archives with RISC OS types
 #   * nspark - for decoding RISC OS archives (Spark, ArcFS and Squash)
-#   * decdrawf - for decoding RISC OS Drawfiles.
+#   * riscos-tbafs - for listing TBAFS files
+#   * riscos-shextract - for listing StrongHelp files
+#   * decdrawf - for decoding RISC OS Drawfiles
+#   * riscos-dumpsprite - for decoding RISC OS sprites
+#   * ccres, riscos-ccres - for decoding RISC OS templates or Toolbox resources
+#
+# A few tools are used to help processing:
+#   * perl - for post-processing content with colouring.
+#   * sed - for post-processing content with colouring.
+#   * grep - checking for content data
+#   * file - to check file content and determine formats
+#       * BBC BASIC file libmagic extensions.
 #
 # Usage:
 #   .lessfilter <file>
@@ -67,6 +79,9 @@ if [[ "$TERM" =~ 256 ]] ; then
     # Should handle xterm-256color and screen's 256 colour terminal settings
     pygmentize_format='terminal256'
 fi
+
+# Any post-processing function after pygmentize has had a go
+pygmentize_post=
 
 # Whether we have reformatted yet
 reformatted=false
@@ -374,6 +389,10 @@ function colour_pygments() {
                 lexer='make'
                 ;;
 
+            Makefile*|*/Makefile*)
+                lexer='make'
+                ;;
+
             *,fd1)
                 lexer='bbcbasic'
                 ;;
@@ -433,7 +452,11 @@ function colour_pygments() {
         pygmentize_opts=('-f' "$pygmentize_format" '-O' "style=$pygmentize_style")
 
         accept_file
-        pygmentize "${pygmentize_opts[@]}" -l "$lexer" "$file"
+        if [ "$pygmentize_post" == '' ] ; then
+            pygmentize "${pygmentize_opts[@]}" -l "$lexer" "$file"
+        else
+            pygmentize "${pygmentize_opts[@]}" -l "$lexer" "$file" | "$pygmentize_post"
+        fi
         exit 0
     fi
     return 0
@@ -456,6 +479,27 @@ function colour_jq() {
             ;;
 
     esac
+}
+
+
+##
+# Use nano-colour to colour file
+function colour_nanocolour() {
+    if ! type -p nano-colour > /dev/null ; then
+        return
+    fi
+
+    local nanodir="${XDG_HOME_DIR:-$HOME/.config}/nano/nanorc"
+    if [[ ! -f "$nanodir" ]] ; then
+        nanodir="/usr/local/etc/nanorc"
+    fi
+    if [[ -e "$nanodir" ]] ; then
+        if nano-colour --supported "$file" "$nanodir" > /dev/null ; then
+            accept_file
+            nano-colour "$file" "$nanodir"
+            exit 0
+        fi
+    fi
 }
 
 
@@ -528,7 +572,7 @@ function format_junitxml() {
 
 
             *.xml)
-                if [[ "$(head "$file" | grep '<testsuite') 2> /dev/null" != '' ]] ; then
+                if [[ "$(head "$file" | grep '<testsuite' 2> /dev/null)" != '' ]] ; then
                     format_to_suffix=".junitxml"
                 fi
                 ;;
@@ -655,7 +699,7 @@ function format_decaof() {
         fi
     done
 
-    if [[ "$format_to_suffix" != '' ]] ;then
+    if [[ "$format_to_suffix" != '' ]] ; then
         format_to="$(basename "$file"):formatted:.${format_to_suffix}"
         accept_format
         # Explicit colouring here:
@@ -788,7 +832,8 @@ function format_markdown() {
         # lines.
         # The second perl filter fixes up some of the output which is untidy with indentations
         # in the wrong places.
-        perl -ne 'BEGIN { @acc = (); $len = 0; $max='"$(tput cols 2> /dev/null || echo 77)"';
+        perl -ne 'BEGIN { @acc = (); $len = 0; $max='"$(tput cols 2> /dev/tty || echo 77)"';
+                          #print "cols=$max\n";
                          sub flush {
                             if (@acc) { print join(" ", @acc) . "\n"; }
                             @acc=(); $len = 0;
@@ -888,11 +933,14 @@ function format_markdown() {
                             # Leave the colouring of the backticks to Pygmentize
                             #$_ = "\e[33m$_\e[0m";
                         }
+                        $star = undef; $code = 0;
                       }
                       elsif ($intable)
                       {
                         if (/^[^\|]/)
-                        { $intable = 0; }
+                        { $intable = 0;
+                          $star = undef; $code = 0;
+                        }
                         s/\|/\e[1;30m|\e[0m/g;
                       }
                       elsif (/^\| .*\|\s*$/)
@@ -900,11 +948,11 @@ function format_markdown() {
                         s/(\| *)([^|]+)/$1\e[36m$2\e[0m/g;
                         s/\|/\e[1;30m|\e[0m/g;
                         $intable = 1;
+                        $star = undef; $code = 0;
                       }
                       elsif (/^(#|---+)/)
                       {
                         $starindented = 0;
-                        $star = undef;
                         $infrontmatter = 0;
                         if (/^---/)
                         {
@@ -914,6 +962,7 @@ function format_markdown() {
                         {
                             $maybefrontmatter = 0;
                         }
+                        $star = undef; $code = 0;
                       }
                       elsif ($maybefrontmatter && /^-?[a-z_0-9\.\-]+:/)
                       {
@@ -934,13 +983,17 @@ function format_markdown() {
                         {
                             s/^( *)(-?[a-z_0-9\.\-]+):(?:( +)(.*))?/$1\e[33m$2\e[0m:$3\e[36m$4\e[0m/;
                         }
+                        $star = undef; $code = 0;
                       }
+                      elsif (defined $star && /^ *\n/)
+                        { $star=undef; }
                       elsif (defined $star && /^$star[^$starch]/ && $_ ne "\n")
-                        { $_ = "$star  $_"; $starindented = 1; }
+                        { $_ =~ s/$star  /$star/;
+                          $_ = "$star  $_"; $starindented = 1; }
                       elsif (defined $star && /^$star[$starch]/ && $starindented)
                         { $_ = "\n$star$_"; $starindented = 0; }
-                      elsif ($code && !/^    / && $_ =~ /^(\e\[[0-9;]*m)*\n/)
-                        { s/([^ ]+)/\e[33m$1\e[0m/g;
+                      elsif ($code && !/^    / && $_ !~ /^(\e\[[0-9;]*m)*\n/)
+                        { s/([^ \n]+)/\e[33m$1\e[0m/g;
                           $_ = "        $_"; }
                       elsif (/^( *)([\*\-]) /)
                         { $star = $1; $starch=$2; $starindented = 0; }
@@ -969,10 +1022,28 @@ function format_markdown() {
                       # Cannot use this one either, as pygmentize breaks it
                       #s/(<!--[^>]*-->)/\e[0;32m$1\e[m/g;
 
+                      s/^(\e\[[0-9;]*m)*\s*(\e\[[0-9;]*m)*\n/\n/;
+
                       print' \
             > "${tmpdir}/${format_to}"
         file="${tmpdir}/${format_to}"
+        pygmentize_post=post_markdown
     fi
+}
+
+##
+# Post process the markdown to add some extra styling.
+function post_markdown() {
+    # This was the first experiment: changing the headings into double-height.
+    # Doesn't work in less :-(
+    #perl -ne 'if (/^(\e\[[0-9;]*m)*(#(?:\e\[[0-9;]*m)* .*)/s) {
+    #            print "$1\e#3$2";
+    #            $_ = "$1\e#4$2";
+    #          }
+    #          print;'
+    perl -ne 'while (s!\e\[(3[0-9;]+m)([A-Za-z0-9/'\''&*%"\-_ ]+)\e\[39m\e\[\1!\e\[$1$2!g) {}
+              s!(https?://[a-z0-9-.]+(/[a-z0-9-.%?#]+)*)!\e]8;;$1\e\\$1\e]8;;\e\\!g;
+              print;'
 }
 
 
@@ -1535,6 +1606,10 @@ function format_nspark() {
                 format_to_suffix="arc"
                 ;;
 
+            *.spk)
+                format_to_suffix="spk"
+                ;;
+
             # NSpark doesn't seem to handle this (I thought it did?)
             #*.squash|,fca)
             #    format_to_suffix="squash"
@@ -1614,6 +1689,156 @@ function format_drawfile() {
 
 
 ##
+# Reformat the file, if we can, using ccres
+function format_ccres() {
+    local format_to_suffix=''
+    local format_to=''
+    local f
+    local args=()
+    local tool=
+
+    if type -p ccres > /dev/null ; then
+        tool="ccres"
+    elif type -p riscos-ccres > /dev/null ; then
+        tool="riscos-ccres"
+    fi
+
+    for f in "$file" "$infered_extension" ; do
+        case "$f" in
+
+            *.rotemplate)
+                format_to_suffix="template"
+                ;;
+            *.rores)
+                format_to_suffix="res"
+                ;;
+        esac
+
+        if [[ "$format_to_suffix" != '' ]] ; then
+            break
+        fi
+    done
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$format_to_suffix" != '' ]] ;then
+        format_to="$(basename "$file"):formatted:.${format_to_suffix}"
+        accept_format
+        if [[ "$format_to_suffix" == 'template' ]] ;then
+            printf "RISC OS Template\n----------------\n\n" > "${tmpdir}/${format_to}"
+            "${tool}" "${args[@]}" "$file" "/dev/stdout" 2>&1 \
+                | LC_ALL=C sed -E -e 's!\r!!' \
+                         -e 's!(-?[0-9][0-9]*),!\1, !g' \
+                         -e 's!([: ,-])(((0x|\&)[a-f0-9]{1,8}|-?[0-9]{1,}(\.[0-9]{1,})?))!\1\x1b[33m\2\x1b[0m!g' \
+                         -e 's!  ([a-z_A-Z\.]{2,}):!  \1: !' \
+                         -e 's!^( *[a-z_A-Z]{2,}) \{!\x1b[35m\1\x1b[0m {!' \
+                         -e 's!(".*")!\x1b[36m\1\x1b[0m!' \
+                         -e 's!(wimp_[A-Z_]{1,})!\x1b[34m\1\x1b[0m!g' \
+                >> "${tmpdir}/${format_to}" 2>&1
+        else
+            printf "RISC OS Toolbox Resource\n------------------------\n\n" > "${tmpdir}/${format_to}"
+            "${tool}" "${args[@]}" "$file" "/dev/stdout" 2>&1 \
+                | LC_ALL=C sed -E -e 's!\r!!' \
+                         -e 's!(-?[0-9][0-9]*),!\1, !g' \
+                         -e 's!([: ,-])(((0x|\&)[a-f0-9]{1,8}|-?[0-9]{1,}(\.[0-9]{1,})?))!\1\x1b[33m\2\x1b[0m!g' \
+                         -e 's!  ([a-z_A-Z\.]{2,}):!  \1: !' \
+                         -e 's!^( *[a-z_A-Z]{2,}) \{!\x1b[35m\1\x1b[0m {!' \
+                         -e 's!(".*")!\x1b[36m\1\x1b[0m!' \
+                         -e 's!([a-z]{3,}_[A-Z_]{1,})!\x1b[34m\1\x1b[0m!g' \
+                >> "${tmpdir}/${format_to}" 2>&1
+        fi
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+
+##
+# Reformat the file, if we can, using riscos-shextract
+function format_stronghelp() {
+    local format_to=''
+    local tool=
+
+    if type -p riscos-shextract > /dev/null ; then
+        tool="riscos-shextract"
+    fi
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$infered_extension" == '.stronghelp' ]] ;then
+        format_to="$(basename "$file"):formatted:${infered_extension}"
+        accept_format
+        printf "RISC OS StrongHelp\n------------------\n\n" > "${tmpdir}/${format_to}"
+        "${tool}" "${args[@]}" "$file" \
+            >> "${tmpdir}/${format_to}" 2>&1
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
+# Reformat the file, if we can, using riscos-tbafs
+function format_tbafs() {
+    local format_to=''
+    local args=()
+    local tool=
+
+    if type -p riscos-tbafs > /dev/null ; then
+        tool="riscos-tbafs"
+        args=(list -v)
+    fi
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$infered_extension" == '.tbafs' ]] ;then
+        format_to="$(basename "$file"):formatted:${infered_extension}"
+        accept_format
+        printf "RISC OS TBAFS\n-------------\n\n" > "${tmpdir}/${format_to}"
+        "${tool}" "${args[@]}" "$file" \
+            >> "${tmpdir}/${format_to}" 2>&1
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
+# Reformat the file, if we can, using riscos-dumpsprites
+function format_sprite() {
+    local format_to=''
+    local args=()
+    local tool=
+
+    if type -p riscos-dumpsprites > /dev/null ; then
+        tool="riscos-dumpsprites"
+        args=(--verbose)
+    fi
+
+    if [[ "$tool" == '' ]] ; then
+        # We don't know what tool to use, so we give up.
+        return
+    fi
+
+    if [[ "$infered_extension" == '.rosprite' ]] ;then
+        format_to="$(basename "$file"):formatted:${infered_extension}"
+        accept_format
+        printf "RISC OS Sprite\n--------------\n\n" > "${tmpdir}/${format_to}"
+        "${tool}" "${args[@]}" "$file" \
+            >> "${tmpdir}/${format_to}" 2>&1
+        file="${tmpdir}/${format_to}"
+    fi
+}
+
+
+##
 # Reformat the CODEOWNERS file; which we have to do ourselves
 function colour_codeowners() {
     case "$file" in
@@ -1681,6 +1906,12 @@ function identify_file() {
         infered_extension='.zip'
     elif [[ "$file_type" =~ squished\ archive\ data ]] ; then
         infered_extension='.squash'
+    elif [[ "$file_type" =~ c\ program\ text ]] ; then
+        infered_extension='.c'
+    elif [[ "$file_type" =~ BBC\ BASIC\ tokenised\ program ]] ; then
+        infered_extension=',ffb'
+    elif [[ "$file_type" =~ BBC\ BASIC\ text\ program ]] ; then
+        infered_extension=',fd1'
     elif [[ "$file_type" =~ ASCII\ text ]] ; then
         # YAML files are not recognised as such by the `file` tool, so we'll look at the first
         # line and see what we think.
@@ -1688,6 +1919,19 @@ function identify_file() {
         if [[ "$firstline" =~ ^%YAML || \
               "$firstline" == '---' ]] ; then
             infered_extension='.yaml'
+        fi
+    elif [[ "$file_type" =~ data ]] ; then
+        local headerdecode
+        headerdecode=$(perl -e 'my $r;
+                                sysread STDIN, $r, 15, 0;
+                                my $type = "";
+                                my ($match) = ($r =~ /^\x1a[\x80-\x89\xff]([!-z]{1,13})\x00/);
+                                if ($match) { $type = ".spk"; }
+                                if ($r =~ /^HELP/) { $type = ".stronghelp"; }
+                                print $type;
+                               ' < "$file")
+        if [[ "$headerdecode" != '' ]] ; then
+            infered_extension="$headerdecode"
         fi
     fi
 }
@@ -1714,12 +1958,56 @@ function identify_extension() {
             infered_extension='.h'
             ;;
 
+        */VersionFortran|VersionFortran)
+            infered_extension='.f90'
+            ;;
+
         *,18c|*,18d)
             infered_extension='.lua'
             ;;
 
         *,aff)
             infered_extension='.drawfile'
+            ;;
+
+        *,b21)
+            infered_extension='.tbafs'
+            ;;
+
+        *,3d6)
+            infered_extension='.stronghelp'
+            ;;
+
+        *,ff9)
+            infered_extension='.rosprite'
+            ;;
+
+        *,fae)
+            infered_extension='.rores'
+            ;;
+
+        *,fec)
+            infered_extension='.rotemplate'
+            ;;
+
+        *,ddc)
+            # Many zip files used the DDC extension, so try to recognise them
+            local headerdecode
+            headerdecode=$(perl -e 'my $r;
+                                    sysread STDIN, $r, 4, 0;
+                                    my $type = "";
+                                    if ($r =~ /^PK\x03\x04/) { $type = ".zip"; }
+                                    print $type;
+                                   ' < "$file")
+            if [[ "$headerdecode" != '' ]] ; then
+                infered_extension="$headerdecode"
+            else
+                infered_extension='.spk'
+            fi
+            ;;
+
+        .bashrc|*/.bashrc)
+            infered_extension='.sh'
             ;;
 
     esac
@@ -1748,7 +2036,11 @@ format_zip
 format_openssl
 format_pyc
 format_nspark
+format_stronghelp
+format_tbafs
 format_drawfile
+format_sprite
+format_ccres
 
 # Now the colourers
 colour_csvkit
@@ -1756,6 +2048,7 @@ colour_grc
 colour_jq
 colour_pygments
 colour_codeowners
+colour_nanocolour
 
 
 if $reformatted ; then
