@@ -275,6 +275,9 @@ trap cleanup EXIT
 # Where we cache things
 cachedir="${XDG_CACHE_HOME:-$HOME/.cache}/lessfilter"
 
+# Denied colouring systems
+deny_colouring_systems=':'
+
 
 ##
 # Accept this file for processing
@@ -292,6 +295,14 @@ function accept_format() {
         exit 0
     fi
     reformatted=true
+}
+
+
+##
+# Disable colouring for a particular engine
+function deny_colouring() {
+    local system="${1:-all}"
+    deny_colouring_systems="$deny_colouring_systems$system:"
 }
 
 
@@ -396,6 +407,53 @@ function pygments_version() {
         echo -n "$pygmentize_stat" > "${cachestat}"
     fi
     echo -n "$version"
+}
+
+##
+# Determine whether the named Pygments style is available.
+#
+# Uses a cached copy of the style list for the installed pygmentize.
+function pygments_has_style() {
+    local style="$1"
+    local cachestat="${cachedir}/pygmentize-stat"
+    local cachestyles="${cachedir}/pygmentize-styles"
+    local pygmentize_stat
+    local cstat
+
+    if [[ "$sysname" == 'Darwin' ]] ; then
+        pygmentize_stat=$(stat -f '%m' "$(which pygmentize)")
+    else
+        pygmentize_stat=$(stat --format '%y' "$(which pygmentize)")
+    fi
+    cstat=$(cat "${cachestat}" 2> /dev/null)
+    if [[ "$pygmentize_stat" != "$cstat" || ! -f "$cachestyles" ]] ; then
+        mkdir -p "$cachedir"
+        pygmentize -L styles 2> /dev/null > "$cachestyles"
+    fi
+
+    grep -Eq "^\\* ${style}:" "$cachestyles"
+}
+
+##
+# Choose a light-background style that exists in the installed Pygments.
+function pygments_light_style() {
+    if pygments_has_style 'gruvbox-light' ; then
+        echo -n 'gruvbox-light'
+        return
+    fi
+    if pygments_has_style 'solarized-light' ; then
+        echo -n 'solarized-light'
+        return
+    fi
+    if pygments_has_style 'friendly' ; then
+        echo -n 'friendly'
+        return
+    fi
+    if pygments_has_style 'xcode' ; then
+        echo -n 'xcode'
+        return
+    fi
+    echo -n 'default'
 }
 
 
@@ -2218,12 +2276,12 @@ format_sprite
 format_ccres
 
 # Now the colourers
-colour_csvkit
-colour_grc
-colour_jq
-colour_pygments
-colour_codeowners
-colour_nanocolour
+if [[ ! "$deny_colouring_systems" =~ :csvkit: ]] ; then colour_csvkit ; fi
+if [[ ! "$deny_colouring_systems" =~ :grc: ]] ; then colour_grc ; fi
+if [[ ! "$deny_colouring_systems" =~ :jq: ]] ; then colour_jq ; fi
+if [[ ! "$deny_colouring_systems" =~ :nano: ]] ; then colour_nanocolour ; fi
+if [[ ! "$deny_colouring_systems" =~ :pygments: ]] ; then colour_pygments ; fi
+if [[ ! "$deny_colouring_systems" =~ :codeowners: ]] ; then colour_codeowners ; fi
 
 
 if $reformatted ; then
