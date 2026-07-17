@@ -802,7 +802,7 @@ function format_xmllint() {
     if [[ "$format_to_suffix" != '' ]] ;then
         format_to="$(basename "$file"):formatted:.${format_to_suffix}"
         accept_format
-        xmllint --nonet --format "$file" > "${tmpdir}/${format_to}"
+        xmllint --nonet --format "$file" > "${tmpdir}/${format_to}" 2> /dev/null
         file="${tmpdir}/${format_to}"
     fi
 }
