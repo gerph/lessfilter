@@ -70,8 +70,175 @@ if [[ "$file" == '' ]] ; then
     exit 0
 fi
 
+function terminal_theme_component_value() {
+    local component
+
+    component=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+
+    case "${#component}" in
+        1)
+            component="${component}${component}"
+            ;;
+        2)
+            ;;
+        3|4)
+            component="${component:0:2}"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    printf '%d' "$((16#$component))"
+}
+
+function terminal_theme_is_light_from_rgb() {
+    local red_value
+    local green_value
+    local blue_value
+
+    red_value=$(terminal_theme_component_value "$1") || return 1
+    green_value=$(terminal_theme_component_value "$2") || return 1
+    blue_value=$(terminal_theme_component_value "$3") || return 1
+
+    (( (red_value * 299) + (green_value * 587) + (blue_value * 114) >= 128000 ))
+}
+
+function terminal_theme_query_background_rgb() {
+    local query
+    local response
+    local ch
+    local escape_seen=false
+    local red
+    local green
+    local blue
+    local tty_state
+
+    if [[ -n "${TMUX:-}" || "$TERM" =~ ^screen ]] ; then
+        return 1
+    fi
+
+    case "${TERM_PROGRAM:-}" in
+        iTerm.app)
+            query=$'\033]4;-2;?\a'
+            ;;
+
+        Apple_Terminal)
+            query=$'\033]11;?\a'
+            ;;
+
+        *)
+            return 1
+            ;;
+    esac
+
+    if [[ ! -r /dev/tty || ! -w /dev/tty ]] ; then
+        return 1
+    fi
+
+    tty_state=$(stty -g < /dev/tty 2> /dev/null) || return 1
+    exec 3<> /dev/tty || return 1
+    stty raw -echo min 0 time 1 < /dev/tty > /dev/null 2>&1 || {
+        exec 3>&-
+        exec 3<&-
+        return 1
+    }
+
+    printf '%s' "$query" >&3 || {
+        stty "$tty_state" < /dev/tty > /dev/null 2>&1
+        exec 3>&-
+        exec 3<&-
+        return 1
+    }
+
+    response=''
+    while IFS= read -r -t 1 -u 3 -n 1 ch ; do
+        if $escape_seen ; then
+            if [[ "$ch" == '\' ]] ; then
+                break
+            fi
+            response+=$'\033'
+            escape_seen=false
+        fi
+
+        if [[ "$ch" == $'\a' ]] ; then
+            break
+        fi
+        if [[ "$ch" == $'\033' ]] ; then
+            escape_seen=true
+            continue
+        fi
+        response+="$ch"
+    done
+
+    stty "$tty_state" < /dev/tty > /dev/null 2>&1
+    exec 3>&-
+    exec 3<&-
+
+    if $escape_seen ; then
+        response+=$'\033'
+    fi
+
+    response="${response#*$'\033]'}"
+    response="${response#*rgb:}"
+    if [[ "$response" == '' ]] ; then
+        return 1
+    fi
+
+    IFS='/' read -r red green blue <<< "$response"
+    if [[ "$red" == '' || "$green" == '' || "$blue" == '' ]] ; then
+        return 1
+    fi
+
+    printf '%s/%s/%s\n' "$red" "$green" "$blue"
+}
+
+function terminal_theme_is_light() {
+    local light_mode_setting="${LESSFILTER_LIGHT_MODE:-}"
+    local light_mode_setting_lc
+    local rgb
+    local red
+    local green
+    local blue
+
+    if [[ "$light_mode_setting" != '' ]] ; then
+        light_mode_setting_lc=$(printf '%s' "$light_mode_setting" | tr '[:upper:]' '[:lower:]')
+        case "$light_mode_setting_lc" in
+            1|true|yes|on)
+                return 0
+                ;;
+
+            0|false|no|off)
+                return 1
+                ;;
+        esac
+    fi
+
+    rgb=$(terminal_theme_query_background_rgb) || return 1
+    IFS='/' read -r red green blue <<< "$rgb"
+    terminal_theme_is_light_from_rgb "$red" "$green" "$blue"
+}
+
 # Configuration
 pygmentize_style='rrt'
+light_mode=false
+if terminal_theme_is_light ; then
+    light_mode=true
+fi
+
+# Diagnostics:
+if false ; then
+    echo "Light mode: $light_mode"
+    if [[ -t 0 ]] ; then
+        echo "input is tty"
+    fi
+    if [[ -t 1 ]] ; then
+        echo "output is tty"
+    fi
+    if [[ -t 2 ]] ; then
+        echo "error is tty"
+    fi
+fi
 
 # Format for output; 'terminal' is the default, but we might change for some formats
 pygmentize_format='terminal'
@@ -429,21 +596,29 @@ function colour_pygments() {
             yaml)
                 # The YAML output for style 'rrt' is very ugly.
                 # Fruity keeps a green comment and blue strings, which is nice.
-                pygmentize_style=fruity
+                if $light_mode ; then
+                    pygmentize_style=$(pygments_light_style)
+                else
+                    pygmentize_style=fruity
+                fi
                 ;;
 
             markdown|md)
                 # For markdown, this looks better
-                if [[ "$(pygments_version)" == '2.5.2' ]] ; then
-                    # Last Python 2.7 version of Pygments
-                    if [[ -f /usr/local/lib/python2.7/dist-packages/pygments/styles/material.py ]] ; then
-                        # This material style has been backported
-                        pygmentize_style=material
-                    else
-                        pygmentize_style=monokai
-                    fi
+                if $light_mode ; then
+                    pygmentize_style=$(pygments_light_style)
                 else
-                    pygmentize_style=material
+                    if [[ "$(pygments_version)" == '2.5.2' ]] ; then
+                        # Last Python 2.7 version of Pygments
+                        if [[ -f /usr/local/lib/python2.7/dist-packages/pygments/styles/material.py ]] ; then
+                            # This material style has been backported
+                            pygmentize_style=material
+                        else
+                            pygmentize_style=monokai
+                        fi
+                    else
+                        pygmentize_style=material
+                    fi
                 fi
                 ;;
         esac
